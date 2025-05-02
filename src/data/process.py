@@ -26,19 +26,10 @@ class DataProcessor:
         else:
             raise NotImplementedError()
 
-    def _process_data(self, ratings: pd.DataFrame) -> pd.DataFrame:
-        ratings = filter_by_cnt(ratings, "item", self.config.min_item_cnt)
-        ratings = filter_by_cnt(ratings, "user", self.config.min_item_cnt)
-        ratings = map_to_idx(ratings, ["user", "item"])
-
-        return ratings.sort_values("timestamp", ignore_index=True).drop(
-            columns=["timestamp"]
-        )
-
     def _split_data(
         self, ratings: pd.DataFrame
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        if self.config.split_method == "random":
+        if self.config.split_method == "ratio":
             total_train, test = split_by_col(ratings, "user", self.config.test_ratio)
             train, val = split_by_col(total_train, "user", self.config.val_ratio)
             return (
@@ -51,7 +42,13 @@ class DataProcessor:
 
     def process(self) -> TrainData:
         ratings = self._load_raw_data()
-        ratings = self._process_data(ratings)
+        ratings = filter_by_cnt(ratings, "item", self.config.min_item_cnt)
+        ratings = filter_by_cnt(ratings, "user", self.config.min_item_cnt)
+        ratings = map_to_idx(ratings, ["user", "item"])
+        ratings = ratings.sort_values("timestamp", ignore_index=True).drop(
+            columns=["timestamp"]
+        )
+
         n_users, n_items = ratings["user"].nunique(), ratings["item"].nunique()
         train, val, test = self._split_data(ratings)
 

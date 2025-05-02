@@ -36,9 +36,7 @@ def config_parser() -> Config:
     parser.add_argument("--seed", type=int, default=100)
     parser.add_argument("--min_user_cnt", type=int, default=5)
     parser.add_argument("--min_item_cnt", type=int, default=5)
-    parser.add_argument(
-        "--split_method", type=str, choices=["random"], default="random"
-    )
+    parser.add_argument("--split_method", type=str, choices=["ratio"], default="ratio")
     parser.add_argument("--test_ratio", type=float, default=0.2)
     parser.add_argument("--val_ratio", type=float, default=0.1)
     parser.add_argument("--n_neg_samples", type=int, default=10)
