@@ -1,5 +1,5 @@
 import argparse
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 
 
 @dataclass
@@ -21,7 +21,8 @@ class Config:
     n_epochs: int
     device: str
     checkpoint_dir: str
-    eval_k: list[int] = field(default_factory=list)
+    eval_k: list[int]
+    max_patience: int
 
     def __str__(self):
         return "\n".join([f"{k}: {v}" for k, v in asdict(self).items()])
@@ -49,6 +50,7 @@ def config_parser() -> Config:
     parser.add_argument("--device", type=str, choices=["cuda", "cpu"], default="cuda")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints/")
     parser.add_argument("--eval_k", type=int, nargs="+", default=[10, 20])
+    parser.add_argument("--max_patience", type=int, default=5)
 
     args = parser.parse_args()
     config = Config(**vars(args))
