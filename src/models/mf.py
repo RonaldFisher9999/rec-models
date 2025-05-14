@@ -25,5 +25,10 @@ class MatrixFactorization(BaseModel):
 
         return self.loss_fn(ufeats, pos_ifeats, neg_ifeats)
 
-    def recommend(self):
-        return
+    def recommend(self, uids: Tensor, k: int) -> Tensor:
+        all_ufeats, all_ifeats = self.forward()
+        ufeats = all_ufeats[uids]
+        scores = ufeats @ all_ifeats.T
+        _, indices = scores.topk(k, dim=-1)
+
+        return indices

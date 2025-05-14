@@ -1,11 +1,13 @@
+import numpy as np
 import torch
 from loguru import logger
+from torch import Tensor
 from torch.utils.data import DataLoader
 
 from src.config import Config
 from src.data.process import TrainData
 from src.models.base_model import BaseModel
-from src.train.train_dataset import BaseDataset
+from src.train.dataset import TrainDataset, ValidDataset
 
 
 class Trainer:
@@ -15,7 +17,10 @@ class Trainer:
         self.device = config.device
         self.loaders = self._set_loaders(data)
         self.optim = torch.optim.Adam(params=model.parameters(), lr=config.lr)
+        self.evaluator = Evaluator(config.eval_k)
         self.patience = 0
+        self.target_metric = "ndcg_10"
+        self.best_score = 0
 
     def train(self):
         logger.info("Start training.")
@@ -36,28 +41,106 @@ class Trainer:
 
     def _set_loaders(self, data: TrainData) -> dict[str, DataLoader]:
         loaders = {}
+        pin_memory = self.device == "cuda"
         for mode in ["train", "val", "test"]:
             rating_data = getattr(data, mode)
-            dataset = BaseDataset(rating_data, data.n_items, self.config.n_neg_samples)
+            if mode == "train":
+                dataset = TrainDataset(
+                    rating_data, data.n_items, self.config.n_neg_samples
+                )
+            else:
+                dataset = ValidDataset(rating_data)
             shuffle = mode == "train"
-            pin_memory = self.device == "cuda"
             loaders[mode] = DataLoader(
-                dataset, self.config.batch_size, shuffle=shuffle, pin_memory=pin_memory
+                dataset,
+                self.config.batch_size,
+                shuffle=shuffle,
+                pin_memory=pin_memory,
+                collate_fn=dataset.collate_fn,
             )
 
         return loaders
 
     def _train_step(self):
-        pass
+        self.model.train()
 
-    def _valid_step(self, mode: str):
-        pass
+        total_loss = 0
+        for batch in self.loaders["train"]:
+            batch = self._to_device(batch)
+            loss = self.model.calc_loss(**batch)
+            total_loss += loss.item()
 
-    def _check_metrics(self, metrics):
-        pass
+            self.optim.zero_grad()
+            loss.backward()
+            self.optim.step()
+
+        logger.info(f"Train Loss: {total_loss:.3f}")
+
+    @torch.inference_mode()
+    def _valid_step(self, mode: str) -> dict[str, dict[int, float]]:
+        max_k = max(self.config.eval_k)
+        self.model.eval()
+
+        labels, preds = [], []
+        for batch in self.loaders[mode]:
+            inputs = self._to_device(batch["inputs"])
+            batch_preds = self.model.recommend(**inputs, k=max_k).detach().cpu().numpy()
+            preds.append(batch_preds)
+            labels.extend(batch["labels"])
+        preds = np.concatenate(preds, axis=0)
+
+        metrics = self.evaluator.calc_metrics(labels, preds)
+        logger.info(metrics)
+
+        return metrics
+
+    def _check_metrics(self, metrics: dict[str, dict[int, float]]) -> bool:
+        metric, k = self.target_metric.split("_")
+        current_score = metrics[metric][int(k)]
+        if current_score > self.best_score:
+            logger.info(
+                f'Update best "{self.target_metric}" score {self.best_score:.3f} -> {current_score:.3f}'
+            )
+            self.best_score = current_score
+            return True
+        else:
+            return False
 
     def _save(self):
         pass
 
     def _load(self):
         pass
+
+    def _to_device(self, batch: dict[str, Tensor]) -> dict[str, Tensor]:
+        return {k: v.to(self.device) for k, v in batch.items()}
+
+
+class Evaluator:
+    def __init__(self, eval_k: list[int]):
+        self.eval_k = sorted(eval_k)
+
+    def calc_metrics(
+        self, labels: list[np.ndarray], preds: np.ndarray
+    ) -> dict[str, dict[int, float]]:
+        metrics = {
+            "recall": {k: 0 for k in self.eval_k},
+            "ndcg": {k: 0 for k in self.eval_k},
+        }
+        n_users = len(labels)
+        for k in self.eval_k:
+            recall_total, ndcg_total = 0, 0
+            discounts = 1.0 / np.log2(np.arange(k, dtype=np.float32) + 2.0)
+            for label, pred_all in zip(labels, preds):
+                pred = pred_all[:k]
+                hits = np.isin(pred, label).astype("float")
+
+                recall_total += hits.sum() / len(label)
+
+                dcg = (hits * discounts).sum()
+                idcg = discounts[: min(len(label), k)].sum()
+                ndcg_total += dcg / idcg
+            metrics["recall"][k] = recall_total / n_users
+            metrics["ndcg"][k] = ndcg_total / n_users
+
+        return metrics
