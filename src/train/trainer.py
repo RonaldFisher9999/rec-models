@@ -1,3 +1,6 @@
+import os
+from datetime import datetime
+
 import numpy as np
 import torch
 from loguru import logger
@@ -20,22 +23,26 @@ class Trainer:
         self.evaluator = Evaluator(config.eval_k)
         self.patience = 0
         self.target_metric = "ndcg_10"
-        self.best_score = 0
+        self.all_metrics = []
+        self.best_score = 0.0
+        self.checkpoint_path = self._set_checkpoint()
 
     def train(self):
         logger.info("Start training.")
         for epoch in range(1, self.config.n_epochs + 1):
             logger.info(f"Epoch {epoch}")
-            self._train_step()
+            train_loss = self._train_step()
             metrics = self._valid_step("val")
+            self.all_metrics.append(metrics)
             if self._check_metrics(metrics):
-                self._save()
+                self._save(epoch, train_loss)
                 self.patience = 0
             else:
                 self.patience += 1
                 if self.patience == self.config.max_patience:
                     logger.info("Early stop training.")
                     break
+        logger.info("Load best model from checkpoint.")
         self._load()
         self._valid_step("test")
 
@@ -61,24 +68,38 @@ class Trainer:
 
         return loaders
 
-    def _train_step(self):
+    def _set_checkpoint(self) -> str:
+        ts = int(datetime.now().timestamp())
+        train_name = f"{self.config.dataset}-{self.config.model}-{ts}"
+        dir = os.path.join(self.config.checkpoint_dir, train_name)
+        path = os.path.join(dir, self.config.checkpoint_file)
+        logger.info(f"Save checkpoint at: {path}")
+        os.makedirs(dir, exist_ok=True)
+
+        return path
+
+    def _train_step(self) -> float:
         self.model.train()
 
-        total_loss = 0
+        total_loss = torch.zeros(1, device=self.device).squeeze_()
         for batch in self.loaders["train"]:
             batch = self._to_device(batch)
             loss = self.model.calc_loss(**batch)
-            total_loss += loss.item()
+            total_loss += loss
 
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
 
+        total_loss = total_loss.item()
         logger.info(f"Train Loss: {total_loss:.3f}")
+
+        return total_loss
 
     @torch.inference_mode()
     def _valid_step(self, mode: str) -> dict[str, dict[int, float]]:
         max_k = max(self.config.eval_k)
+        logger.info(f"{mode.capitalize()} step.")
         self.model.eval()
 
         labels, preds = [], []
@@ -106,11 +127,21 @@ class Trainer:
         else:
             return False
 
-    def _save(self):
-        pass
+    def _save(self, epoch: int, train_loss: float):
+        checkpoint = {
+            "model_state": self.model.state_dict(),
+            "optim_state": self.optim.state_dict(),
+            "epoch": epoch,
+            "train_loss": train_loss,
+            "metrics": self.all_metrics,
+            "best_score": self.best_score,
+            "patience": self.patience,
+        }
+        torch.save(checkpoint, self.checkpoint_path)
 
     def _load(self):
-        pass
+        checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
+        self.model.load_state_dict(checkpoint["model_state"])
 
     def _to_device(self, batch: dict[str, Tensor]) -> dict[str, Tensor]:
         return {k: v.to(self.device) for k, v in batch.items()}

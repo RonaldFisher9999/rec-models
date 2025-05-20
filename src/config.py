@@ -21,6 +21,7 @@ class Config:
     n_epochs: int
     device: str
     checkpoint_dir: str
+    checkpoint_file: str
     eval_k: list[int]
     max_patience: int
 
@@ -49,6 +50,7 @@ def config_parser() -> Config:
     parser.add_argument("--n_epochs", type=int, default=20)
     parser.add_argument("--device", type=str, choices=["cuda", "cpu"], default="cuda")
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints/")
+    parser.add_argument("--checkpoint_file", type=str, default="checkpoint.pt")
     parser.add_argument("--eval_k", type=int, nargs="+", default=[10, 20])
     parser.add_argument("--max_patience", type=int, default=5)
 
