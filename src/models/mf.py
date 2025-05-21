@@ -14,7 +14,7 @@ class MatrixFactorization(BaseModel):
         self.item_emb = nn.Embedding(self.n_items, self.emb_dim)
         self.loss_fn = self._set_loss_fn(loss_fn)
 
-    def forward(self):
+    def forward(self) -> tuple[Tensor, Tensor]:
         return self.user_emb.weight, self.item_emb.weight
 
     def calc_loss(self, uids: Tensor, pos_iids: Tensor, neg_iids: Tensor) -> Tensor:
@@ -25,7 +25,7 @@ class MatrixFactorization(BaseModel):
 
         return self.loss_fn(ufeats, pos_ifeats, neg_ifeats)
 
-    def recommend(self, uids: Tensor, k: int) -> Tensor:
+    def recommend(self, uids: Tensor, k: int, **kwargs) -> Tensor:
         all_ufeats, all_ifeats = self.forward()
         ufeats = all_ufeats[uids]
         scores = ufeats @ all_ifeats.T

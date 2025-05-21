@@ -1,8 +1,11 @@
 import os
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
+import torch
 from loguru import logger
+from torch import Tensor
 
 from src.config import Config
 
@@ -14,6 +17,7 @@ class TrainData:
     test: pd.DataFrame
     n_users: int
     n_items: int
+    adj: Tensor | None
 
 
 class DataProcessor:
@@ -48,11 +52,14 @@ class DataProcessor:
         ratings = ratings.sort_values("timestamp", ignore_index=True).drop(
             columns=["timestamp"]
         )
-
         n_users, n_items = ratings["user"].nunique(), ratings["item"].nunique()
         train, val, test = self._split_data(ratings)
+        if self.config.model in ["lightgcn"]:
+            adj = build_adj_mat(train, n_users, n_items)
+        else:
+            adj = None
 
-        return TrainData(train, val, test, n_users, n_items)
+        return TrainData(train, val, test, n_users, n_items, adj)
 
 
 def load_movielens(data_dir: str) -> pd.DataFrame:
@@ -94,3 +101,23 @@ def split_by_col(
         size = max(1, int(len(g) * ratio))
         indices.extend(g.tail(size).index.tolist())
     return df.loc[~df.index.isin(set(indices)), :], df.loc[indices, :]
+
+
+def build_adj_mat(df: pd.DataFrame, n_users: int, n_items: int) -> Tensor:
+    user_idx = torch.from_numpy(df["user"].to_numpy(np.int64))
+    item_idx = torch.from_numpy(df["item"].to_numpy(np.int64) + n_users)
+    u2i_idx = torch.stack([user_idx, item_idx], dim=0)
+    i2u_idx = torch.stack([item_idx, user_idx], dim=0)
+
+    edge_idx = torch.concat([u2i_idx, i2u_idx], dim=1)
+    values = torch.ones(edge_idx.shape[1], dtype=torch.float32)
+    n = n_users + n_items
+    adj = torch.sparse_coo_tensor(edge_idx, values, size=(n, n))
+
+    degree = torch.sparse.sum(adj, dim=0).to_dense()
+    norm_degree = degree.pow(-0.5)
+    # norm_degree[norm_degree == float('inf')] = 0.0
+    rows, cols = edge_idx[0], edge_idx[1]
+    norm_values = norm_degree[rows] * norm_degree[cols]
+
+    return torch.sparse_coo_tensor(edge_idx, norm_values, size=(n, n)).to_sparse_csc()

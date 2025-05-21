@@ -6,6 +6,7 @@ import torch
 from loguru import logger
 from torch import Tensor
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from src.config import Config
 from src.data.process import TrainData
@@ -44,7 +45,9 @@ class Trainer:
                     break
         logger.info("Load best model from checkpoint.")
         self._load()
-        self._valid_step("test")
+        test_metrics = self._valid_step("test")
+        metric, k = self.target_metric.split("_")
+        logger.info(f"Test score: {test_metrics[metric][int(k)]:.3f}")
 
     def _set_loaders(self, data: TrainData) -> dict[str, DataLoader]:
         loaders = {}
@@ -82,7 +85,7 @@ class Trainer:
         self.model.train()
 
         total_loss = torch.zeros(1, device=self.device).squeeze_()
-        for batch in self.loaders["train"]:
+        for batch in tqdm(self.loaders["train"]):
             batch = self._to_device(batch)
             loss = self.model.calc_loss(**batch)
             total_loss += loss
@@ -103,9 +106,16 @@ class Trainer:
         self.model.eval()
 
         labels, preds = [], []
-        for batch in self.loaders[mode]:
+        need_update = True  # for LightGCN
+        for batch in tqdm(self.loaders[mode]):
             inputs = self._to_device(batch["inputs"])
-            batch_preds = self.model.recommend(**inputs, k=max_k).detach().cpu().numpy()
+            batch_preds = (
+                self.model.recommend(**inputs, k=max_k, need_update=need_update)
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            need_update = False
             preds.append(batch_preds)
             labels.extend(batch["labels"])
         preds = np.concatenate(preds, axis=0)

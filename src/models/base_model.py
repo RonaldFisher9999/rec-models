@@ -8,15 +8,15 @@ from src.models.loss import BCELoss, BPRLoss
 
 class BaseModel(nn.Module):
     @abstractmethod
-    def forward(self):
+    def forward(self, *args, **kwargs):
         raise NotImplementedError
 
     @abstractmethod
-    def calc_loss(self) -> Tensor:
+    def calc_loss(self, *args, **kwargs) -> Tensor:
         raise NotImplementedError
 
     @abstractmethod
-    def recommend(self) -> Tensor:
+    def recommend(self, *args, **kwargs) -> Tensor:
         raise NotImplementedError
 
     def _set_loss_fn(self, loss_fn: str):

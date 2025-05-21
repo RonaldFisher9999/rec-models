@@ -34,7 +34,9 @@ def config_parser() -> Config:
     parser.add_argument(
         "--dataset", type=str, choices=["movielens"], default="movielens"
     )
-    parser.add_argument("--model", type=str, choices=["mf"], default="mf")
+    parser.add_argument(
+        "--model", type=str, choices=["mf", "lightgcn"], default="lightgcn"
+    )
     parser.add_argument("--seed", type=int, default=100)
     parser.add_argument("--min_user_cnt", type=int, default=5)
     parser.add_argument("--min_item_cnt", type=int, default=5)
