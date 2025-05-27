@@ -30,8 +30,8 @@ class LightGCN(BaseModel):
         self.conv_layers = nn.ModuleList([LightGraphConv() for _ in range(n_layers)])
         self.alpha = 1 / (n_layers + 1)
         self.loss_fn = self._set_loss_fn(loss_fn)
-        self.cached_ufeats = torch.empty(n_users, emb_dim)
-        self.cached_ifeats = torch.empty(n_items, emb_dim)
+        self.ufeats = torch.empty(n_users, emb_dim)
+        self.ifeats = torch.empty(n_items, emb_dim)
 
     def forward(self) -> tuple[Tensor, Tensor]:
         feats = self.all_emb.weight
@@ -54,9 +54,9 @@ class LightGCN(BaseModel):
 
     def recommend(self, uids: Tensor, k: int, need_update: bool, **kwargs) -> Tensor:
         if need_update:
-            self.cached_ufeats, self.cached_ifeats = self.forward()
-        ufeats = self.cached_ufeats[uids]
-        scores = ufeats @ self.cached_ifeats.T
+            self.ufeats, self.ifeats = self.forward()
+        ufeats = self.ufeats[uids]
+        scores = ufeats @ self.ifeats.T
         _, indices = scores.topk(k, dim=-1)
 
         return indices

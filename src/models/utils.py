@@ -1,7 +1,6 @@
 from src.config import Config
 from src.data.process import TrainData
-from src.models.lightgcn import LightGCN
-from src.models.mf import MatrixFactorization
+from src.models import LightGCN, MatrixFactorization
 
 
 def build_model(config: Config, data: TrainData):

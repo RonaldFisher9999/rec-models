@@ -59,7 +59,11 @@ class Trainer:
                     rating_data, data.n_items, self.config.n_neg_samples
                 )
             else:
-                dataset = ValidDataset(rating_data)
+                if mode == "val":
+                    dataset = ValidDataset(rating_data, data.train)
+                else:
+                    dataset = ValidDataset(rating_data, data.train, data.val)
+
             shuffle = mode == "train"
             loaders[mode] = DataLoader(
                 dataset,
@@ -105,22 +109,25 @@ class Trainer:
         logger.info(f"{mode.capitalize()} step.")
         self.model.eval()
 
-        labels, preds = [], []
+        labels, seen, preds = [], [], []
         need_update = True  # for LightGCN
         for batch in tqdm(self.loaders[mode]):
-            inputs = self._to_device(batch["inputs"])
+            inputs = self._to_device(batch["model_input"])
+            extra_k = max(x.size for x in batch["seen"])
             batch_preds = (
-                self.model.recommend(**inputs, k=max_k, need_update=need_update)
+                self.model.recommend(
+                    **inputs, k=max_k + extra_k, need_update=need_update
+                )
                 .detach()
                 .cpu()
                 .numpy()
             )
             need_update = False
-            preds.append(batch_preds)
             labels.extend(batch["labels"])
-        preds = np.concatenate(preds, axis=0)
+            seen.extend(batch["seen"])
+            preds.extend([pred for pred in batch_preds])
 
-        metrics = self.evaluator.calc_metrics(labels, preds)
+        metrics = self.evaluator.calc_metrics(labels, preds, seen)
         logger.info(metrics)
 
         return metrics
@@ -160,20 +167,27 @@ class Trainer:
 class Evaluator:
     def __init__(self, eval_k: list[int]):
         self.eval_k = sorted(eval_k)
+        self.exclude_seen = False
 
     def calc_metrics(
-        self, labels: list[np.ndarray], preds: np.ndarray
+        self,
+        labels: list[np.ndarray],
+        preds: list[np.ndarray],
+        all_seen: list[np.ndarray],
     ) -> dict[str, dict[int, float]]:
         metrics = {
-            "recall": {k: 0 for k in self.eval_k},
-            "ndcg": {k: 0 for k in self.eval_k},
+            "recall": {k: 0.0 for k in self.eval_k},
+            "ndcg": {k: 0.0 for k in self.eval_k},
         }
         n_users = len(labels)
         for k in self.eval_k:
             recall_total, ndcg_total = 0, 0
             discounts = 1.0 / np.log2(np.arange(k, dtype=np.float32) + 2.0)
-            for label, pred_all in zip(labels, preds):
-                pred = pred_all[:k]
+            for label, pred, seen in zip(labels, preds, all_seen):
+                if self.exclude_seen:
+                    pred = pred[~np.isin(pred, seen)][:k]
+                else:
+                    pred = pred[:k]
                 hits = np.isin(pred, label).astype("float")
 
                 recall_total += hits.sum() / len(label)

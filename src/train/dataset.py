@@ -1,6 +1,5 @@
 from typing import Any
 
-import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, default_collate
@@ -31,27 +30,50 @@ class TrainDataset(Dataset):
 
 
 class ValidDataset(Dataset):
-    def __init__(self, rating_data: pd.DataFrame):
+    def __init__(self, ratings: pd.DataFrame, *seen: pd.DataFrame):
         super().__init__()
-        self.data = self._convert_data(rating_data)
+        self.data = self._convert_data(ratings, *seen)
 
-    def _convert_data(self, rating_data: pd.DataFrame) -> list[tuple[int, np.ndarray]]:
-        data = (
-            rating_data.groupby("user")["item"].apply(lambda x: x.to_numpy()).to_dict()
+    def _convert_data(
+        self, ratings: pd.DataFrame, *seen: pd.DataFrame
+    ) -> list[dict[str, Any]]:
+        seen_grouped = (
+            pd.concat(seen, axis=0)[["user", "item"]]
+            .groupby("user")["item"]
+            .apply(lambda x: x.to_numpy())
+            .rename("seen")
         )
-        return list(data.items())
+        ratings_grouped = (
+            ratings[["user", "item"]]
+            .groupby("user")["item"]
+            .apply(lambda x: x.to_numpy())
+            .rename("labels")
+        )
+        return (
+            pd.merge(ratings_grouped, seen_grouped, on="user")
+            .reset_index()
+            .to_dict(orient="records")
+        )
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx: int):
-        uid, labels = self.data[idx]
-
-        return {"labels": labels, "inputs": {"uids": uid}}
+        row = self.data[idx]
+        return {
+            "labels": row["labels"],
+            "seen": row["seen"],
+            "model_input": {"uids": row["user"]},
+        }
 
     @staticmethod
     def collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
         labels = [data["labels"] for data in batch]
-        inputs = [data["inputs"] for data in batch]
+        seen = [data["seen"] for data in batch]
+        model_input = [data["model_input"] for data in batch]
 
-        return {"labels": labels, "inputs": default_collate(inputs)}
+        return {
+            "labels": labels,
+            "seen": seen,
+            "model_input": default_collate(model_input),
+        }
