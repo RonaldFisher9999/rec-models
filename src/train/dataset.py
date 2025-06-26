@@ -16,8 +16,8 @@ class CFTrainDataset(Dataset):
         self.n_neg_samples = config.n_neg_samples
         self.data = self._convert_data(data.train)
 
-    def _convert_data(self, rating_df: pd.DataFrame) -> list[dict[int, int]]:
-        return rating_df[["user", "item"]].to_dict(orient="records")
+    def _convert_data(self, train_df: pd.DataFrame) -> list[dict[str, Any]]:
+        return train_df[["user", "item"]].to_dict(orient="records")
 
     def __len__(self):
         return len(self.data)
@@ -108,9 +108,9 @@ class SequentialTrainDataset(Dataset):
         self.n_neg_samples = config.n_neg_samples
         self.data = self._convert_data(data.train)
 
-    def _convert_data(self, rating_df: pd.DataFrame) -> list[dict[int, np.ndarray]]:
+    def _convert_data(self, train_df: pd.DataFrame) -> list[dict[str, Any]]:
         return (
-            rating_df[["user", "item", "timestamp"]]
+            train_df[["user", "item", "timestamp"]]
             # .sort_values('timestamp')
             .groupby("user")["item"]
             .apply(lambda x: x.to_numpy()[-self.max_len :])

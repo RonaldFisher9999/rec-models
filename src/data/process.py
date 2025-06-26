@@ -31,37 +31,37 @@ class DataProcessor:
             raise NotImplementedError()
 
     def _split_data(
-        self, ratings: pd.DataFrame
+        self, df: pd.DataFrame
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         if self.config.split_method in ("ratio", "leave_one_out"):
-            total_train, test = split_by_col(
-                ratings, "user", self.config.split_method, self.config.test_ratio
+            train_val_df, test_df = split_by_col(
+                df, "user", self.config.split_method, self.config.test_ratio
             )
-            train, val = split_by_col(
-                total_train, "user", self.config.split_method, self.config.val_ratio
+            train_df, val_df = split_by_col(
+                train_val_df, "user", self.config.split_method, self.config.val_ratio
             )
             return (
-                train.reset_index(drop=True),
-                val.reset_index(drop=True),
-                test.reset_index(drop=True),
+                train_df.reset_index(drop=True),
+                val_df.reset_index(drop=True),
+                test_df.reset_index(drop=True),
             )
         else:
             raise NotImplementedError()
 
     def process(self) -> TrainData:
-        ratings = self._load_raw_data()
-        ratings = filter_by_cnt(ratings, "item", self.config.min_item_cnt)
-        ratings = filter_by_cnt(ratings, "user", self.config.min_item_cnt)
-        ratings = map_to_idx(ratings, ["user", "item"])
-        ratings = ratings.sort_values("timestamp", ignore_index=True)
-        n_users, n_items = ratings["user"].nunique(), ratings["item"].nunique()
-        train, val, test = self._split_data(ratings)
+        df = self._load_raw_data()
+        df = filter_by_cnt(df, "item", self.config.min_item_cnt)
+        df = filter_by_cnt(df, "user", self.config.min_item_cnt)
+        df = map_to_idx(df, ["user", "item"])
+        df = df.sort_values("timestamp", ignore_index=True)
+        n_users, n_items = df["user"].nunique(), df["item"].nunique()
+        train_df, val_df, test_df = self._split_data(df)
         if self.config.model in ["lightgcn"]:
-            adj = build_adj_mat(train, n_users, n_items)
+            adj = build_adj_mat(train_df, n_users, n_items)
         else:
             adj = None
 
-        return TrainData(train, val, test, n_users, n_items, adj)
+        return TrainData(train_df, val_df, test_df, n_users, n_items, adj)
 
 
 def load_movielens(data_dir: str) -> pd.DataFrame:
