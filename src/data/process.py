@@ -33,9 +33,13 @@ class DataProcessor:
     def _split_data(
         self, ratings: pd.DataFrame
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        if self.config.split_method == "ratio":
-            total_train, test = split_by_col(ratings, "user", self.config.test_ratio)
-            train, val = split_by_col(total_train, "user", self.config.val_ratio)
+        if self.config.split_method in ("ratio", "leave_one_out"):
+            total_train, test = split_by_col(
+                ratings, "user", self.config.split_method, self.config.test_ratio
+            )
+            train, val = split_by_col(
+                total_train, "user", self.config.split_method, self.config.val_ratio
+            )
             return (
                 train.reset_index(drop=True),
                 val.reset_index(drop=True),
@@ -93,14 +97,21 @@ def map_to_idx(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
 
 
 def split_by_col(
-    df: pd.DataFrame, col: str, ratio: float
+    df: pd.DataFrame, col: str, method: str, ratio: float | None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     grouped = df.groupby(col)
-    indices = []
-    for _, g in grouped:
-        size = max(1, int(len(g) * ratio))
-        indices.extend(g.tail(size).index.tolist())
-    return df.loc[~df.index.isin(set(indices)), :], df.loc[indices, :]
+    if method == "ratio":
+        indices = []
+        for _, g in grouped:
+            size = max(1, int(len(g) * ratio))
+            indices.extend(g.tail(size).index.tolist())
+        return df.loc[~df.index.isin(set(indices)), :], df.loc[indices, :]
+    elif method == "leave_one_out":
+        tails = grouped.tail(1)
+        indices = tails.index
+        return df.loc[~df.index.isin(set(indices)), :], tails
+    else:
+        raise NotImplementedError()
 
 
 def build_adj_mat(df: pd.DataFrame, n_users: int, n_items: int) -> Tensor:
