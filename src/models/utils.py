@@ -1,6 +1,6 @@
 from src.config import Config
 from src.data.process import TrainData
-from src.models import LightGCN, MatrixFactorization
+from src.models import LightGCN, MatrixFactorization, SASRec
 
 
 def build_model(config: Config, data: TrainData):
@@ -18,5 +18,17 @@ def build_model(config: Config, data: TrainData):
             data.adj.to(device),
             config.loss_fn,
         ).to(device)
+    elif config.model == "sasrec":
+        return SASRec(
+            data.n_items,
+            config.emb_dim,
+            config.max_len,
+            config.n_heads,
+            config.n_layers,
+            config.dropout_p,
+            data.n_items,
+            True,
+            config.loss_fn,
+        ).to(device)
     else:
-        raise NotImplementedError
+        raise NotImplementedError()

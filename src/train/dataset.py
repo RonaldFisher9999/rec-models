@@ -1,11 +1,12 @@
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, default_collate
 
 
-class TrainDataset(Dataset):
+class CFTrainDataset(Dataset):
     def __init__(self, rating_data: pd.DataFrame, n_items: int, n_neg_samples: int):
         super().__init__()
         self.data = rating_data[["user", "item"]].values.astype("int64")
@@ -29,7 +30,7 @@ class TrainDataset(Dataset):
         return default_collate(batch)
 
 
-class ValidDataset(Dataset):
+class CFValidDataset(Dataset):
     def __init__(self, ratings: pd.DataFrame, *seen: pd.DataFrame):
         super().__init__()
         self.data = self._convert_data(ratings, *seen)
@@ -77,3 +78,57 @@ class ValidDataset(Dataset):
             "seen": seen,
             "model_input": default_collate(model_input),
         }
+
+
+class SequentialTrainDataset(Dataset):
+    def __init__(
+        self,
+        rating_data: pd.DataFrame,
+        max_len: int,
+        padding_idx: int,
+        n_items: int,
+        n_neg_samples: int,
+    ):
+        super().__init__()
+        self.max_len = max_len
+        self.padding_idx = padding_idx
+        self.paddings = np.full(max_len, self.padding_idx)
+        self.n_items = n_items
+        self.n_neg_samples = n_neg_samples
+        self.data = self._convert_data(rating_data)
+
+    def _convert_data(self, rating_data: pd.DataFrame) -> list[tuple[int, np.ndarray]]:
+        data = (
+            rating_data.groupby("user")["item"]
+            .apply(lambda iids: np.array(iids)[-self.max_len :])
+            .to_dict()
+        )
+        return list(data.items())
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx: int):
+        uid, seq = self.data[idx]
+        seq = self._apply_paddings(seq)
+        pos_iids = seq[:-1]
+        labels = seq[1:]
+        pad_mask = pos_iids == self.padding_idx
+        neg_iids = self._sample_negs()
+
+        return {
+            "pos_iids": pos_iids,
+            "neg_iids": neg_iids,
+            "pad_mask": pad_mask,
+            "labels": labels,
+        }
+
+    def _apply_paddings(self, seq: np.ndarray) -> np.ndarray:
+        return np.append(self.paddings, seq)[-self.max_len :]
+
+    def _sample_negs(self) -> np.ndarray:
+        return np.random.randint(0, self.n_items, (self.max_len, self.n_neg_samples))
+
+    @staticmethod
+    def collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
+        return default_collate(batch)
