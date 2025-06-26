@@ -4,6 +4,7 @@ from src.config import config_parser
 from src.data.process import DataProcessor
 from src.models.utils import build_model
 from src.train.trainer import Trainer
+from src.train.utils import build_dataloaders
 
 
 def main():
@@ -14,8 +15,9 @@ def main():
     data = processor.process()
 
     model = build_model(config, data)
+    dataloaders = build_dataloaders(config, data)
 
-    trainer = Trainer(config, data, model)
+    trainer = Trainer(config, model, dataloaders)
     trainer.train()
 
 

@@ -27,6 +27,11 @@ class Config:
     checkpoint_file: str
     eval_k: list[int]
     max_patience: int
+    model_type: str | None = None
+
+    def __post_init__(self):
+        model_type_map = {"mf": "cf", "lightgcn": "cf", "sasrec": "sequential"}
+        self.model_type = model_type_map[self.model]
 
     def __str__(self):
         return "\n".join([f"{k}: {v}" for k, v in asdict(self).items()])
@@ -58,7 +63,7 @@ def config_parser() -> Config:
     parser.add_argument("--emb_dim", type=int, default=128)
     parser.add_argument("--n_heads", type=int, default=4)
     parser.add_argument("--dropout_p", type=float, default=0.2)
-    parser.add_argument("--batch_size", type=int, default=1024)
+    parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--n_epochs", type=int, default=20)
     parser.add_argument("--device", type=str, choices=["cuda", "cpu"], default="cuda")

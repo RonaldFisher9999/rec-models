@@ -9,17 +9,17 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.config import Config
-from src.data.process import TrainData
 from src.models.base_model import BaseModel
-from src.train.dataset import TrainDataset, ValidDataset
 
 
 class Trainer:
-    def __init__(self, config: Config, data: TrainData, model: BaseModel):
+    def __init__(
+        self, config: Config, model: BaseModel, dataloders: dict[str, DataLoader]
+    ):
         self.config = config
         self.model = model
+        self.dataloaders = dataloders
         self.device = config.device
-        self.loaders = self._set_loaders(data)
         self.optim = torch.optim.Adam(params=model.parameters(), lr=config.lr)
         self.evaluator = Evaluator(config.eval_k)
         self.patience = 0
@@ -49,32 +49,6 @@ class Trainer:
         metric, k = self.target_metric.split("_")
         logger.info(f"Test score: {test_metrics[metric][int(k)]:.3f}")
 
-    def _set_loaders(self, data: TrainData) -> dict[str, DataLoader]:
-        loaders = {}
-        pin_memory = self.device == "cuda"
-        for mode in ["train", "val", "test"]:
-            rating_data = getattr(data, mode)
-            if mode == "train":
-                dataset = TrainDataset(
-                    rating_data, data.n_items, self.config.n_neg_samples
-                )
-            else:
-                if mode == "val":
-                    dataset = ValidDataset(rating_data, data.train)
-                else:
-                    dataset = ValidDataset(rating_data, data.train, data.val)
-
-            shuffle = mode == "train"
-            loaders[mode] = DataLoader(
-                dataset,
-                self.config.batch_size,
-                shuffle=shuffle,
-                pin_memory=pin_memory,
-                collate_fn=dataset.collate_fn,
-            )
-
-        return loaders
-
     def _set_checkpoint(self) -> str:
         ts = int(datetime.now().timestamp())
         train_name = f"{self.config.dataset}-{self.config.model}-{ts}"
@@ -89,7 +63,7 @@ class Trainer:
         self.model.train()
 
         total_loss = torch.zeros(1, device=self.device).squeeze_()
-        for batch in tqdm(self.loaders["train"]):
+        for batch in tqdm(self.dataloaders["train"]):
             batch = self._to_device(batch)
             loss = self.model.calc_loss(**batch)
             total_loss += loss
@@ -111,7 +85,7 @@ class Trainer:
 
         labels, seen, preds = [], [], []
         need_update = True  # for LightGCN
-        for batch in tqdm(self.loaders[mode]):
+        for batch in tqdm(self.dataloaders[mode]):
             inputs = self._to_device(batch["model_input"])
             extra_k = max(x.size for x in batch["seen"])
             batch_preds = (
@@ -167,7 +141,7 @@ class Trainer:
 class Evaluator:
     def __init__(self, eval_k: list[int]):
         self.eval_k = sorted(eval_k)
-        self.exclude_seen = False
+        self.exclude_seen = True
 
     def calc_metrics(
         self,
@@ -195,7 +169,7 @@ class Evaluator:
                 dcg = (hits * discounts).sum()
                 idcg = discounts[: min(len(label), k)].sum()
                 ndcg_total += dcg / idcg
-            metrics["recall"][k] = recall_total / n_users
-            metrics["ndcg"][k] = ndcg_total / n_users
+            metrics["recall"][k] = float(recall_total / n_users)
+            metrics["ndcg"][k] = float(ndcg_total / n_users)
 
         return metrics

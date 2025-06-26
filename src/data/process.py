@@ -53,9 +53,7 @@ class DataProcessor:
         ratings = filter_by_cnt(ratings, "item", self.config.min_item_cnt)
         ratings = filter_by_cnt(ratings, "user", self.config.min_item_cnt)
         ratings = map_to_idx(ratings, ["user", "item"])
-        ratings = ratings.sort_values("timestamp", ignore_index=True).drop(
-            columns=["timestamp"]
-        )
+        ratings = ratings.sort_values("timestamp", ignore_index=True)
         n_users, n_items = ratings["user"].nunique(), ratings["item"].nunique()
         train, val, test = self._split_data(ratings)
         if self.config.model in ["lightgcn"]:
@@ -73,6 +71,7 @@ def load_movielens(data_dir: str) -> pd.DataFrame:
         path, sep="::", engine="python", header=None, encoding="latin1"
     ).iloc[:, [0, 1, 3]]
     df.columns = ["user", "item", "timestamp"]
+    # TODO need to add random noise to gurantee same order
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s")
 
     return df
