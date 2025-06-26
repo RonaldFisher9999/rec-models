@@ -1,6 +1,6 @@
 from src.config import Config
-from src.data.process import TrainData
 from src.models import LightGCN, MatrixFactorization, SASRec
+from src.process.processor import TrainData
 
 
 def build_model(config: Config, data: TrainData):

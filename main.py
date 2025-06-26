@@ -1,8 +1,8 @@
 from loguru import logger
 
 from src.config import config_parser
-from src.data.process import DataProcessor
 from src.models.utils import build_model
+from src.process.processor import DataProcessor
 from src.train.trainer import Trainer
 from src.train.utils import build_dataloaders
 

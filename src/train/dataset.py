@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset, default_collate
 
 from src.config import Config
-from src.data.process import TrainData
+from src.process.processor import TrainData
 
 
 class CFTrainDataset(Dataset):

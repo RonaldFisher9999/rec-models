@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader, Dataset
 
 from src.config import Config
-from src.data.process import TrainData
+from src.process.processor import TrainData
 from src.train.dataset import (
     CFTrainDataset,
     CFValidDataset,
