@@ -3,7 +3,11 @@ from abc import abstractmethod
 import torch.nn as nn
 from torch import Tensor
 
-from src.models.loss import BCELoss, BPRLoss
+from src.models.loss import (
+    BCELossWithNegativeSamples,
+    BPRLossWithNegativeSamples,
+    CELossWithNegativeSamples,
+)
 
 
 class BaseModel(nn.Module):
@@ -21,8 +25,10 @@ class BaseModel(nn.Module):
 
     def _set_loss_fn(self, loss_fn: str):
         if loss_fn == "bpr":
-            return BPRLoss()
+            return BPRLossWithNegativeSamples()
         elif loss_fn == "bce":
-            return BCELoss()
+            return BCELossWithNegativeSamples()
+        elif loss_fn == "ce":
+            return CELossWithNegativeSamples()
         else:
             raise NotImplementedError
