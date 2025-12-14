@@ -1,9 +1,18 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
 from src.models.base_model import BaseModel
+from src.models.registry import register_model
+
+if TYPE_CHECKING:
+    from src.config import Config
+    from src.process.processor import TrainData
 
 
 class MultiHeadAttention(nn.Module):
@@ -107,7 +116,22 @@ class TransformerBlock(nn.Module):
         return feats
 
 
+@register_model("sasrec", model_type="sequential")
 class SASRec(BaseModel):
+    @classmethod
+    def build(cls, config: Config, data: TrainData) -> SASRec:
+        return cls(
+            n_items=data.n_items,
+            emb_dim=config.emb_dim,
+            max_len=config.max_len,
+            n_heads=config.n_heads,
+            n_blocks=config.n_layers,
+            dropout_p=config.dropout_p,
+            padding_idx=data.n_items,
+            causal=True,
+            loss_fn=config.loss_fn,
+        )
+
     def __init__(
         self,
         n_items: int,

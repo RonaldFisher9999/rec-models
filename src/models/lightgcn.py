@@ -1,8 +1,17 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import torch
 import torch.nn as nn
 from torch import Tensor
 
 from src.models.base_model import BaseModel
+from src.models.registry import register_model
+
+if TYPE_CHECKING:
+    from src.config import Config
+    from src.process.processor import TrainData
 
 
 class LightGraphConv(nn.Module):
@@ -10,7 +19,19 @@ class LightGraphConv(nn.Module):
         return torch.sparse.mm(adj, feats)
 
 
+@register_model("lightgcn", model_type="cf")
 class LightGCN(BaseModel):
+    @classmethod
+    def build(cls, config: Config, data: TrainData) -> LightGCN:
+        return cls(
+            n_users=data.n_users,
+            n_items=data.n_items,
+            emb_dim=config.emb_dim,
+            n_layers=config.n_layers,
+            adj=data.adj.to(config.device),
+            loss_fn=config.loss_fn,
+        )
+
     def __init__(
         self,
         n_users: int,

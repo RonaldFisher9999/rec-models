@@ -1,10 +1,29 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import torch.nn as nn
 from torch import Tensor
 
 from src.models.base_model import BaseModel
+from src.models.registry import register_model
+
+if TYPE_CHECKING:
+    from src.config import Config
+    from src.process.processor import TrainData
 
 
+@register_model("mf", model_type="cf")
 class MatrixFactorization(BaseModel):
+    @classmethod
+    def build(cls, config: Config, data: TrainData) -> MatrixFactorization:
+        return cls(
+            n_users=data.n_users,
+            n_items=data.n_items,
+            emb_dim=config.emb_dim,
+            loss_fn=config.loss_fn,
+        )
+
     def __init__(self, n_users: int, n_items: int, emb_dim: int, loss_fn: str):
         super().__init__()
         self.n_users = n_users

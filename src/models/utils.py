@@ -1,34 +1,14 @@
 from src.config import Config
-from src.models import LightGCN, MatrixFactorization, SASRec
+from src.models.base_model import BaseModel
+from src.models.registry import get_model_class
 from src.process.processor import TrainData
 
 
-def build_model(config: Config, data: TrainData):
-    device = config.device
-    if config.model == "mf":
-        return MatrixFactorization(
-            data.n_users, data.n_items, config.emb_dim, config.loss_fn
-        ).to(device)
-    elif config.model == "lightgcn":
-        return LightGCN(
-            data.n_users,
-            data.n_items,
-            config.emb_dim,
-            config.n_layers,
-            data.adj.to(device),
-            config.loss_fn,
-        ).to(device)
-    elif config.model == "sasrec":
-        return SASRec(
-            data.n_items,
-            config.emb_dim,
-            config.max_len,
-            config.n_heads,
-            config.n_layers,
-            config.dropout_p,
-            data.n_items,
-            True,
-            config.loss_fn,
-        ).to(device)
-    else:
-        raise NotImplementedError()
+def build_model(config: Config, data: TrainData) -> BaseModel:
+    """Build model from config using registry.
+
+    The model class is looked up from MODEL_REGISTRY and its `build`
+    class method is called to construct the instance.
+    """
+    model_cls = get_model_class(config.model)
+    return model_cls.build(config, data).to(config.device)

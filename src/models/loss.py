@@ -4,6 +4,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
+from src.models.registry import register_loss
+
 
 class BaseLossWithNegativeSamples:
     @abstractmethod
@@ -33,6 +35,7 @@ class BaseLossWithNegativeSamples:
         return loss.sum() / mask.sum().clamp(min=1)
 
 
+@register_loss("bpr")
 class BPRLossWithNegativeSamples(BaseLossWithNegativeSamples):
     def __call__(self, ufeats, pos_ifeats, neg_ifeats, pad_mask=None, **kwargs):
         pos_scores = (ufeats * pos_ifeats).sum(dim=-1, keepdim=True)
@@ -47,6 +50,7 @@ class BPRLossWithNegativeSamples(BaseLossWithNegativeSamples):
             return loss.mean()
 
 
+@register_loss("bce")
 class BCELossWithNegativeSamples(BaseLossWithNegativeSamples):
     def __call__(
         self, ufeats, pos_ifeats, neg_ifeats, pad_mask=None, **kwargs
@@ -66,6 +70,7 @@ class BCELossWithNegativeSamples(BaseLossWithNegativeSamples):
             return loss.mean()
 
 
+@register_loss("ce")
 class CELossWithNegativeSamples(BaseLossWithNegativeSamples):
     def __call__(
         self, ufeats, pos_ifeats, neg_ifeats, pad_mask=None, **kwargs

@@ -1,6 +1,14 @@
 import argparse
 from dataclasses import asdict, dataclass
 
+# Import models package to populate the registry before parsing args
+import src.models  # noqa: F401
+from src.models.registry import (
+    LOSS_REGISTRY,
+    MODEL_REGISTRY,
+    get_model_type,
+)
+
 
 @dataclass
 class Config:
@@ -30,8 +38,7 @@ class Config:
     model_type: str | None = None
 
     def __post_init__(self):
-        model_type_map = {"mf": "cf", "lightgcn": "cf", "sasrec": "sequential"}
-        self.model_type = model_type_map[self.model]
+        self.model_type = get_model_type(self.model)
 
     def __str__(self):
         return "\n".join([f"{k}: {v}" for k, v in asdict(self).items()])
@@ -43,7 +50,7 @@ def config_parser() -> Config:
         "--dataset", type=str, choices=["movielens"], default="movielens"
     )
     parser.add_argument(
-        "--model", type=str, choices=["mf", "lightgcn", "sasrec"], default="mf"
+        "--model", type=str, choices=list(MODEL_REGISTRY.keys()), default="mf"
     )
     parser.add_argument("--seed", type=int, default=100)
     parser.add_argument("--min_user_cnt", type=int, default=5)
@@ -59,7 +66,7 @@ def config_parser() -> Config:
     parser.add_argument("--max_len", type=int, default=50)
     parser.add_argument("--n_neg_samples", type=int, default=10)
     parser.add_argument(
-        "--loss_fn", type=str, choices=["bpr", "bce", "ce"], default="ce"
+        "--loss_fn", type=str, choices=list(LOSS_REGISTRY.keys()), default="ce"
     )
     parser.add_argument("--n_layers", type=int, default=3)
     parser.add_argument("--emb_dim", type=int, default=128)
