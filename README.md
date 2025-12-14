@@ -9,13 +9,6 @@ PyTorch 기반 추천 시스템 모델 구현 프로젝트.
 - **Dataset**: MovieLens-1M
 - **Evaluation**: Recall@K, NDCG@K
 
-## Installation
-
-```bash
-./init.bash <python_version>
-```
-
-> PyTorch 버전은 < 2.4.0
 
 ## Usage
 
