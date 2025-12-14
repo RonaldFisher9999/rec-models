@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 if TYPE_CHECKING:
@@ -7,7 +9,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 MODEL_REGISTRY: dict[str, dict[str, Any]] = {}
-LOSS_REGISTRY: dict[str, type["BaseLossWithNegativeSamples"]] = {}
+LOSS_REGISTRY: dict[str, type[BaseLossWithNegativeSamples]] = {}
 
 
 def register_model(name: str, model_type: str) -> Callable[[type[T]], type[T]]:
@@ -53,7 +55,7 @@ def register_loss(name: str) -> Callable[[type[T]], type[T]]:
     return decorator
 
 
-def get_model_class(name: str) -> type["BaseModel"]:
+def get_model_class(name: str) -> type[BaseModel]:
     """Get model class by name."""
     if name not in MODEL_REGISTRY:
         available = list(MODEL_REGISTRY.keys())
@@ -69,7 +71,7 @@ def get_model_type(name: str) -> str:
     return MODEL_REGISTRY[name]["type"]
 
 
-def get_loss_class(name: str) -> type["BaseLossWithNegativeSamples"]:
+def get_loss_class(name: str) -> type[BaseLossWithNegativeSamples]:
     """Get loss class by name."""
     if name not in LOSS_REGISTRY:
         available = list(LOSS_REGISTRY.keys())
