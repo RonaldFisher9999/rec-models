@@ -51,7 +51,7 @@ class DataProcessor:
     def process(self) -> TrainData:
         df = self._load_raw_data()
         df = filter_by_cnt(df, "item", self.config.min_item_cnt)
-        df = filter_by_cnt(df, "user", self.config.min_item_cnt)
+        df = filter_by_cnt(df, "user", self.config.min_user_cnt)
         df = map_to_idx(df, ["user", "item"])
         df = df.sort_values("timestamp", ignore_index=True)
         n_users, n_items = df["user"].nunique(), df["item"].nunique()
