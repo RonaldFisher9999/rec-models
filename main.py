@@ -5,10 +5,12 @@ from src.models.utils import build_model
 from src.process.processor import DataProcessor
 from src.train.trainer import Trainer
 from src.train.utils import build_dataloaders
+from src.utils import set_seed
 
 
 def main():
     config = config_parser()
+    set_seed(config.seed)
     logger.info(config)
 
     processor = DataProcessor(config)
