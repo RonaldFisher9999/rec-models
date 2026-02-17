@@ -55,15 +55,13 @@ class LightGCN(BaseModel):
         self.ifeats = torch.empty(n_items, emb_dim)
 
     def forward(self) -> tuple[Tensor, Tensor]:
-        feats = self.all_emb.weight
-
-        out = [feats]
+        x = self.all_emb.weight
+        out = x
         for conv in self.conv_layers:
-            feats = conv(self.adj, feats)
-            out.append(feats)
-        all_feats = torch.stack(out, dim=0).sum(dim=0) * self.alpha
-
-        return all_feats[: self.n_users, :], all_feats[self.n_users :, :]
+            x = conv(self.adj, x)
+            out = out + x
+        out = out * self.alpha
+        return torch.split(out, [self.n_users, self.n_items], dim=0)
 
     def calc_loss(self, uids: Tensor, pos_iids: Tensor, neg_iids: Tensor) -> Tensor:
         all_ufeats, all_ifeats = self.forward()
