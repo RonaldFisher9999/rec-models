@@ -34,11 +34,17 @@ class Config:
     checkpoint_dir: str
     checkpoint_file: str
     eval_k: list[int]
+    early_stop_metric: str
+    early_stop_k: int
     max_patience: int
     model_type: str | None = None
 
     def __post_init__(self):
         self.model_type = get_model_type(self.model)
+        if self.early_stop_k not in self.eval_k:
+            raise ValueError(
+                f"`early_stop_k` ({self.early_stop_k}) must be included in `eval_k` ({self.eval_k})."
+            )
 
     def __str__(self):
         return "\n".join([f"{k}: {v}" for k, v in asdict(self).items()])
@@ -79,6 +85,10 @@ def config_parser() -> Config:
     parser.add_argument("--checkpoint_dir", type=str, default="checkpoints/")
     parser.add_argument("--checkpoint_file", type=str, default="checkpoint.pt")
     parser.add_argument("--eval_k", type=int, nargs="+", default=[10, 20])
+    parser.add_argument(
+        "--early_stop_metric", type=str, choices=["ndcg", "recall"], default="ndcg"
+    )
+    parser.add_argument("--early_stop_k", type=int, default=10)
     parser.add_argument("--max_patience", type=int, default=5)
 
     args = parser.parse_args()

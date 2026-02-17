@@ -23,7 +23,8 @@ class Trainer:
         self.optim = torch.optim.Adam(params=model.parameters(), lr=config.lr)
         self.evaluator = Evaluator(config.eval_k)
         self.patience = 0
-        self.target_metric = "ndcg_10"
+        self.target_metric = config.early_stop_metric
+        self.target_k = config.early_stop_k
         self.all_metrics = []
         self.best_score = 0.0
         self.checkpoint_path = self._set_checkpoint()
@@ -46,8 +47,10 @@ class Trainer:
         logger.info("Load best model from checkpoint.")
         self._load()
         test_metrics = self._valid_step("test")
-        metric, k = self.target_metric.split("_")
-        logger.info(f"Test score: {test_metrics[metric][int(k)]:.3f}")
+        logger.info(
+            f"Test score ({self.target_metric}@{self.target_k}): "
+            f"{test_metrics[self.target_metric][self.target_k]:.3f}"
+        )
 
     def _set_checkpoint(self) -> str:
         ts = int(datetime.now().timestamp())
@@ -107,11 +110,11 @@ class Trainer:
         return metrics
 
     def _check_metrics(self, metrics: dict[str, dict[int, float]]) -> bool:
-        metric, k = self.target_metric.split("_")
-        current_score = metrics[metric][int(k)]
+        current_score = metrics[self.target_metric][self.target_k]
         if current_score > self.best_score:
             logger.info(
-                f'Update best "{self.target_metric}" score {self.best_score:.3f} -> {current_score:.3f}'
+                f'Update best "{self.target_metric}@{self.target_k}" score '
+                f"{self.best_score:.3f} -> {current_score:.3f}"
             )
             self.best_score = current_score
             return True
