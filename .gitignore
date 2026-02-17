@@ -1,3 +1,4 @@
+.codex/
 dataset/
 *.ipynb
 checkpoint.pt
